@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hrvadl/go_aws_test/pkg/aws"
+	"github.com/hrvadl/go_aws_test/pkg/config"
 	"github.com/hrvadl/go_aws_test/pkg/handlers"
 	"github.com/hrvadl/go_aws_test/pkg/services"
 	"github.com/joho/godotenv"
@@ -25,12 +26,16 @@ func (s *Server) Setup() error {
 		log.Printf("cannot load .env file: %v", err)
 	}
 
+	cfg := config.NewEnv()
 	session := aws.NewSession()
 	cognito := aws.NewCognito(session)
-	authH := handlers.NewAuthHandler(services.NewAuthService(cognito))
+	auth := services.NewAuthService(cognito, cfg)
+
+	authH := handlers.NewAuthHandler(auth)
 
 	s.srv.POST("/login", authH.HandleLogin)
 	s.srv.POST("/sign-up", authH.HandleRegister)
+	s.srv.POST("/confirm", authH.HandleConfirm)
 
 	return nil
 }
