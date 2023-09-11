@@ -27,15 +27,21 @@ func (s *Server) Setup() error {
 	}
 
 	cfg := config.NewEnv()
-	session := aws.NewSession()
+	jwt := services.NewJWTValidator(cfg)
+	session := aws.NewSession(cfg)
 	cognito := aws.NewCognito(session)
-	auth := services.NewAuthService(cognito, cfg)
+	auth := services.NewAuthService(cognito, cfg, jwt)
 
 	authH := handlers.NewAuthHandler(auth)
 
-	s.srv.POST("/login", authH.HandleLogin)
-	s.srv.POST("/sign-up", authH.HandleRegister)
-	s.srv.POST("/confirm", authH.HandleConfirm)
+	protected := s.srv.Group("", auth.CheckIdentityMiddleware)
+	public := s.srv.Group("")
+
+	public.POST("/login", authH.HandleLogin)
+	public.POST("/sign-up", authH.HandleRegister)
+	public.POST("/confirm", authH.HandleConfirm)
+
+	protected.GET("/home", func(ctx *gin.Context) {})
 
 	return nil
 }

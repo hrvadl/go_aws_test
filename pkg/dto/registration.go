@@ -25,12 +25,3 @@ func (o *SignInDTO) GetCognitoEmailAttribute() *cognitoidentityprovider.Attribut
 		Value: &o.Email,
 	}
 }
-
-// For the sake of simplicity skip email verification
-func (o *SignInDTO) GetCognitoEmailVerifiedAttribute() *cognitoidentityprovider.AttributeType {
-	verified := "true"
-	return &cognitoidentityprovider.AttributeType{
-		Name:  &emailVerifiedAttributeName,
-		Value: &verified,
-	}
-}

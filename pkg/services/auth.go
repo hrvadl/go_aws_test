@@ -1,31 +1,39 @@
 package services
 
 import (
+	"net/http"
+	"strings"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/cognitoidentityprovider"
+	"github.com/gin-gonic/gin"
 	"github.com/hrvadl/go_aws_test/pkg/config"
 	"github.com/hrvadl/go_aws_test/pkg/dto"
 )
 
-var UserAuthFlow = "USER_PASSWORD_AUTH"
+var UserPasswordAuthFlow = "USER_PASSWORD_AUTH"
+var TokenAuthFlow = "REFRESH_TOKEN_AUTH"
 
 type Auth interface {
 	SignUp(in *dto.SignInDTO) error
 	Login(in *dto.LoginDTO) (*cognitoidentityprovider.AuthenticationResultType, error)
 	Confirm(in *dto.ConfirmDTO) error
+	CheckIdentityMiddleware(*gin.Context)
 }
 
 type AuthService struct {
+	jwt      JWTValidator
 	config   *config.Env
 	cognito  *cognitoidentityprovider.CognitoIdentityProvider
 	clientID string
 }
 
-func NewAuthService(cognito *cognitoidentityprovider.CognitoIdentityProvider, cfg *config.Env) *AuthService {
+func NewAuthService(cognito *cognitoidentityprovider.CognitoIdentityProvider, cfg *config.Env, jwt JWTValidator) *AuthService {
 	return &AuthService{
 		clientID: cfg.CognitoID,
 		cognito:  cognito,
 		config:   cfg,
+		jwt:      jwt,
 	}
 }
 
@@ -63,7 +71,7 @@ func (a *AuthService) Login(in *dto.LoginDTO) (*cognitoidentityprovider.Authenti
 	}
 
 	res, err := a.cognito.InitiateAuth(&cognitoidentityprovider.InitiateAuthInput{
-		AuthFlow:       &UserAuthFlow,
+		AuthFlow:       &UserPasswordAuthFlow,
 		ClientId:       &a.clientID,
 		AuthParameters: params,
 	})
@@ -75,4 +83,25 @@ func (a *AuthService) Login(in *dto.LoginDTO) (*cognitoidentityprovider.Authenti
 	return res.AuthenticationResult, nil
 }
 
-func (a *AuthService) CheckIdentityMiddleware() {}
+func (a *AuthService) CheckIdentityMiddleware(ctx *gin.Context) {
+	tokenH := ctx.GetHeader("Authorization")
+	parts := strings.Split(tokenH, " ")
+
+	if len(parts) != 2 {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid auth method",
+		})
+		return
+	}
+
+	token := parts[1]
+
+	if err := a.jwt.Validate(token); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{
+			"error": err.Error(),
+		})
+		return
+	}
+
+	ctx.Next()
+}
