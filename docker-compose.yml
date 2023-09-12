@@ -1,0 +1,9 @@
+services:
+  api:
+    image: auth
+    build: .
+    container_name: auth
+    env_file:
+      - ./cmd/.env
+    ports:
+      - 8080:8080
