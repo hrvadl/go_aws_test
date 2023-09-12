@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Login</title>
+  </head>
+  <body>
+    <div class="form-wrapper">
+      <input type="text" placeholder="Type your username" />
+      <input type="password" placeholder="Type your password" />
+      <button class="submit-button" type="submit">Login</button>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    const submitBtn = document.querySelector(".submit-button");
+    const usernameInput = document.querySelector('input[type="text"]');
+    const passwordInput = document.querySelector('input[type="password"]');
+
+    const post = (body, URL) => {
+      return fetch(URL, {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    };
+
+    const clickHandler = async () => {
+      const username = usernameInput.value;
+      const password = passwordInput.value;
+
+      const body = JSON.stringify({
+        username,
+        password,
+      });
+
+      try {
+        const res = await post(body, "/login");
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        localStorage.setItem("token", data?.data);
+        window.location.href = "/public/home.html";
+      } catch (e) {
+        alert(e);
+      }
+    };
+
+    if (submitBtn && usernameInput && passwordInput) {
+      submitBtn.addEventListener("click", clickHandler);
+    }
+  </script>
+</html>

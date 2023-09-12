@@ -14,7 +14,7 @@ import (
 )
 
 type JWTValidator interface {
-	Validate(string) error
+	Validate(string) (string, error)
 }
 
 type CognitoJWTValidator struct {
@@ -27,7 +27,7 @@ func NewJWTValidator(cfg *config.Env) JWTValidator {
 	}
 }
 
-func (v *CognitoJWTValidator) Validate(jwtToken string) error {
+func (v *CognitoJWTValidator) Validate(jwtToken string) (string, error) {
 	pKey, err := v.getPublicKeys(v.cfg.AWSRegion, v.cfg.UserPoolID)
 
 	if err != nil {
@@ -39,28 +39,35 @@ func (v *CognitoJWTValidator) Validate(jwtToken string) error {
 	parsedToken, err := jwt.Parse([]byte(jwtToken), jwt.WithKeySet(keySet))
 
 	if parsedToken == nil {
-		return errors.New("invalid token")
+		return "", errors.New("invalid token")
+	}
+
+	if err != nil {
+		return "", errors.New("invalid token")
 	}
 
 	tokenUse, _ := parsedToken.Get("token_use")
 
-	if err != nil {
-		return errors.New("invalid token")
-	}
-
 	if parsedToken.Issuer() != fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", v.cfg.AWSRegion, v.cfg.UserPoolID) {
-		return errors.New("token is from a different pool_id")
+		return "", errors.New("token is from a different pool_id")
 	}
 
 	if tokenUse != "id" && tokenUse != "access" {
-		return errors.New("token is from a different source")
+		return "", errors.New("token is from a different source")
 	}
 
 	if time.Now().After(parsedToken.Expiration()) {
-		return errors.New("token expired")
+		return "", errors.New("token expired")
 	}
 
-	return nil
+	usernameHeader, _ := parsedToken.Get("username")
+	username := fmt.Sprint(usernameHeader)
+
+	if username == "" {
+		return "", errors.New("invalid username")
+	}
+
+	return username, nil
 }
 
 func (v *CognitoJWTValidator) getPublicKeys(region string, cognitoPoolId string) ([]byte, error) {

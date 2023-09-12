@@ -2,6 +2,7 @@ package server
 
 import (
 	"log"
+	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/hrvadl/go_aws_test/pkg/aws"
@@ -36,12 +37,17 @@ func (s *Server) Setup() error {
 
 	protected := s.srv.Group("", auth.CheckIdentityMiddleware)
 	public := s.srv.Group("")
+	static := s.srv.Group("/public")
+
+	static.StaticFS("", http.Dir("./pkg/public"))
 
 	public.POST("/login", authH.HandleLogin)
 	public.POST("/sign-up", authH.HandleRegister)
 	public.POST("/confirm", authH.HandleConfirm)
 
 	protected.GET("/home", func(ctx *gin.Context) {})
+	protected.GET("/log-out", authH.HandleLogout)
+	protected.GET("/me", authH.HandleGetMe)
 
 	return nil
 }

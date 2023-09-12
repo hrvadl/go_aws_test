@@ -11,14 +11,19 @@ import (
 	"github.com/hrvadl/go_aws_test/pkg/dto"
 )
 
-var UserPasswordAuthFlow = "USER_PASSWORD_AUTH"
-var TokenAuthFlow = "REFRESH_TOKEN_AUTH"
+var (
+	UserPasswordAuthFlow = "USER_PASSWORD_AUTH"
+	TokenAuthFlow        = "REFRESH_TOKEN_AUTH"
+	UserCtxKey           = "USER"
+)
 
 type Auth interface {
-	SignUp(in *dto.SignInDTO) error
-	Login(in *dto.LoginDTO) (*cognitoidentityprovider.AuthenticationResultType, error)
+	SignUp(in *dto.SignUpDTO) error
+	Login(in *dto.LoginDTO) (*string, error)
 	Confirm(in *dto.ConfirmDTO) error
 	CheckIdentityMiddleware(*gin.Context)
+	GetUserByName(username string) (*dto.UserDTO, error)
+	Logout(token string) error
 }
 
 type AuthService struct {
@@ -37,7 +42,7 @@ func NewAuthService(cognito *cognitoidentityprovider.CognitoIdentityProvider, cf
 	}
 }
 
-func (a *AuthService) SignUp(in *dto.SignInDTO) error {
+func (a *AuthService) SignUp(in *dto.SignUpDTO) error {
 	_, err := a.cognito.SignUp(&cognitoidentityprovider.SignUpInput{
 		Username: &in.Username,
 		Password: &in.Password,
@@ -64,7 +69,7 @@ func (a *AuthService) Confirm(in *dto.ConfirmDTO) error {
 	return err
 }
 
-func (a *AuthService) Login(in *dto.LoginDTO) (*cognitoidentityprovider.AuthenticationResultType, error) {
+func (a *AuthService) Login(in *dto.LoginDTO) (*string, error) {
 	params := map[string]*string{
 		"USERNAME": aws.String(in.Username),
 		"PASSWORD": aws.String(in.Password),
@@ -80,7 +85,7 @@ func (a *AuthService) Login(in *dto.LoginDTO) (*cognitoidentityprovider.Authenti
 		return nil, err
 	}
 
-	return res.AuthenticationResult, nil
+	return res.AuthenticationResult.AccessToken, nil
 }
 
 func (a *AuthService) CheckIdentityMiddleware(ctx *gin.Context) {
@@ -95,13 +100,45 @@ func (a *AuthService) CheckIdentityMiddleware(ctx *gin.Context) {
 	}
 
 	token := parts[1]
+	username, err := a.jwt.Validate(token)
 
-	if err := a.jwt.Validate(token); err != nil {
+	if err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{
 			"error": err.Error(),
 		})
 		return
 	}
 
+	ctx.Set(UserCtxKey, username)
 	ctx.Next()
+}
+
+func (a *AuthService) GetUserByName(username string) (*dto.UserDTO, error) {
+	res, err := a.cognito.AdminGetUser(&cognitoidentityprovider.AdminGetUserInput{
+		UserPoolId: &a.config.UserPoolID,
+		Username:   &username,
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	var userEmail string
+
+	for _, attr := range res.UserAttributes {
+		if *attr.Name == "email" {
+			userEmail = *attr.Value
+		}
+	}
+
+	return &dto.UserDTO{Email: userEmail, Username: *res.Username}, nil
+}
+
+func (a *AuthService) Logout(username string) error {
+	_, err := a.cognito.AdminUserGlobalSignOut(&cognitoidentityprovider.AdminUserGlobalSignOutInput{
+		UserPoolId: &a.config.UserPoolID,
+		Username:   &username,
+	})
+
+	return err
 }

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home</title>
+</head>
+<body>
+    <div class="user-info-wrapper">
+        <div class="user-email"></div>
+        <div class="user-name"></div>
+    </div>
+    <button class="log-out" type="button">Log out</button> 
+</body>
+
+<script type="text/javascript">
+    const token =localStorage.getItem("token") 
+
+    if (!token) {
+        alert("Login to access this page")
+        window.location.href = "/public/login.html"
+    }
+
+    const logOutButton = document.querySelector('.log-out');
+    const userEmailContainer = document.querySelector('.user-email');
+    const userNameContainer = document.querySelector('.user-name');
+
+    const get = (URL, token) => {
+      return fetch(URL, {
+        method: "GET",
+        headers: {
+          "Authorization": "Bearer " + token
+        },
+      });
+    };
+
+    const clearStorage = async () => {
+        localStorage.clear()
+    }
+
+    const logOut = async () => {
+      Promise.all([get("/log-out", token), clearStorage()])  
+    }
+
+    const getMe = async() => {
+        const res = await get('/me', token)
+        const user = await res.json()
+        userNameContainer.textContent = `Username: ${user.data.username}`
+        userEmailContainer.textContent = `Email: ${user.data.email}`
+    }
+
+    logOutButton?.addEventListener('click', logOut)
+    getMe()
+</script>
+</html>

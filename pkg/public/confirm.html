@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Confirm email</title>
+  </head>
+  <body>
+    <div class="form-wrapper">
+      <input type="text" placeholder="Type your verification code here" />
+      <button class="submit-button" type="submit">Confirm</button>
+    </div>
+  </body>
+
+  <script type="text/javascript">
+    const submitBtn = document.querySelector(".submit-button");
+    const codeInput = document.querySelector('input[type="text"]');
+
+    const post = (body, URL) => {
+      return fetch(URL, {
+        method: "POST",
+        body,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      });
+    };
+
+    const clickHandler = async () => {
+      const code = codeInput.value;
+      const username = localStorage.getItem("username");
+
+      const body = JSON.stringify({
+        code,
+        username,
+      });
+
+      try {
+        const res = await post(body, "/confirm");
+        const data = await res.json();
+
+        if (data.error) {
+          throw new Error(data.error);
+        }
+
+        if (!data?.success) {
+          throw new Error("Registration failed");
+        }
+
+        alert("Confirmation successfully completed! Now you could login");
+
+        localStorage.setItem("username", username);
+        window.location.href = "/public/login.html";
+      } catch (e) {
+        alert(e);
+      }
+    };
+
+    if (submitBtn && codeInput) {
+      submitBtn.addEventListener("click", clickHandler);
+    }
+  </script>
+</html>

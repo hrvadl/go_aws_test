@@ -12,6 +12,8 @@ type AuthHandler interface {
 	HandleRegister(*gin.Context)
 	HandleLogin(ctx *gin.Context)
 	HandleConfirm(ctx *gin.Context)
+	HandleLogout(ctx *gin.Context)
+	HandleGetMe(ctx *gin.Context)
 }
 
 type Auth struct {
@@ -23,7 +25,7 @@ func NewAuthHandler(authSrv services.Auth) AuthHandler {
 }
 
 func (s *Auth) HandleRegister(ctx *gin.Context) {
-	var body dto.SignInDTO
+	var body dto.SignUpDTO
 
 	if err := ctx.Bind(&body); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
@@ -70,4 +72,24 @@ func (s *Auth) HandleConfirm(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusCreated, gin.H{"success": true})
+}
+
+func (s *Auth) HandleLogout(ctx *gin.Context) {
+	if err := s.authSrv.Logout(ctx.GetString(services.UserCtxKey)); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+func (s *Auth) HandleGetMe(ctx *gin.Context) {
+	me, err := s.authSrv.GetUserByName(ctx.GetString(services.UserCtxKey))
+
+	if err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"data": me})
 }
